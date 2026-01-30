@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Realtime Election Poll</title>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
+<style>
+body {
+    font-family: "Segoe UI", Arial, sans-serif;
+    background: linear-gradient(135deg, #eef2f7, #dfe7f2);
+    text-align: center;
+    padding: 40px;
+}
+
+h1 { margin-bottom: 8px; }
+p { color: #555; }
+
+.poll {
+    display: grid;
+    grid-template-columns: repeat(2, 220px);
+    gap: 20px;
+    justify-content: center;
+    margin-top: 30px;
+}
+
+.option {
+    background: white;
+    border-radius: 14px;
+    padding: 25px;
+    cursor: pointer;
+    box-shadow: 0 6px 14px rgba(0,0,0,0.12);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.option:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.18);
+}
+
+.party-name {
+    font-size: 20px;
+    font-weight: bold;
+}
+
+.votes {
+    margin-top: 8px;
+    font-size: 15px;
+    color: #555;
+}
+
+.leader-box {
+    margin-top: 35px;
+    padding: 18px;
+    background: white;
+    border-radius: 12px;
+    width: 520px;
+    max-width: 95%;
+    margin-left: auto;
+    margin-right: auto;
+    box-shadow: 0 6px 14px rgba(0,0,0,0.12);
+    font-size: 16px;
+    font-weight: 500;
+}
+
+.tie { color: #ff9800; }
+.leader { color: #2e7d32; }
+
+.disabled {
+    pointer-events: none;
+    opacity: 0.6;
+}
+
+#voteMessage {
+    margin-top: 15px;
+    font-weight: 600;
+}
+</style>
+</head>
+
+<body>
+
+<h1>🗳️ Realtime Election Poll</h1>
+<p>Click once to cast your vote</p>
+
+<div class="poll" id="poll">
+    <div class="option" onclick="vote('DMK')">
+        <div class="party-name">DMK</div>
+        <div class="votes"><span id="DMK">0</span> votes</div>
+    </div>
+
+    <div class="option" onclick="vote('ADMK')">
+        <div class="party-name">ADMK</div>
+        <div class="votes"><span id="ADMK">0</span> votes</div>
+    </div>
+
+    <div class="option" onclick="vote('TVK')">
+        <div class="party-name">TVK</div>
+        <div class="votes"><span id="TVK">0</span> votes</div>
+    </div>
+
+    <div class="option" onclick="vote('NTK')">
+        <div class="party-name">NTK</div>
+        <div class="votes"><span id="NTK">0</span> votes</div>
+    </div>
+</div>
+
+<div id="voteMessage"></div>
+
+<div class="leader-box" id="leaderText">Waiting for votes...</div>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyBIL0pRV0uvHIn9vzvLge6p2V24g8Ub_Es",
+  authDomain: "election-poll-154ae.firebaseapp.com",
+  databaseURL: "https://election-poll-154ae-default-rtdb.firebaseio.com",
+  projectId: "election-poll-154ae",
+  storageBucket: "election-poll-154ae.appspot.com",
+  messagingSenderId: "344729640768",
+  appId: "1:344729640768:web:13c92e5502fd663471a4a5"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const votesRef = db.ref("votes");
+
+// Initialize votes if empty
+votesRef.once("value", snap => {
+    if (!snap.exists()) {
+        votesRef.set({ DMK: 0, ADMK: 0, TVK: 0, NTK: 0 });
+    }
+});
+
+// Vote function
+function vote(party) {
+    if (localStorage.getItem("voted")) return;
+
+    votesRef.child(party).transaction(count => (count || 0) + 1);
+    localStorage.setItem("voted", "true");
+    disableVoting();
+}
+
+// Disable voting UI
+function disableVoting() {
+    document.getElementById("poll").classList.add("disabled");
+}
+
+// Live vote updates
+votesRef.on("value", snapshot => {
+    const data = snapshot.val() || {};
+    let max = Math.max(...Object.values(data));
+    let leaders = Object.keys(data).filter(p => data[p] === max);
+
+    for (let party in data) {
+        document.getElementById(party).innerText = data[party];
+    }
+
+    const leaderText = document.getElementById("leaderText");
+    const voteMessage = document.getElementById("voteMessage");
+
+    if (max === 0) {
+        leaderText.innerText = "Waiting for votes...";
+        return;
+    }
+
+    if (leaders.length === 1) {
+        leaderText.innerHTML =
+            `<span class="leader">${leaders[0]} is leading with ${max} votes</span>`;
+
+        if (localStorage.getItem("voted")) {
+            voteMessage.innerHTML =
+                `🗳️ You already voted. Current leader: <b>${leaders[0]}</b>`;
+        }
+    } else {
+        leaderText.innerHTML =
+            `<span class="tie">It is a tie. Your vote may change the result.</span>`;
+
+        if (localStorage.getItem("voted")) {
+            voteMessage.innerHTML =
+                `🗳️ You already voted. It's currently a tie.`;
+        }
+    }
+});
+
+// Lock voting if already voted
+if (localStorage.getItem("voted")) {
+    disableVoting();
+}
+</script>
+
+</body>
+</html>
